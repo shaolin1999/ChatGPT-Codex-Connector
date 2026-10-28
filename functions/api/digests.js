@@ -70,13 +70,13 @@ export async function onRequestGet({request,env}){
       return respond({ok:true,issue:publicIssue(latest)});
     }
     const page=pageNumber(params.get("page"));
-    const perPage=12;
+    const perPage=[10,20,30,50].includes(Number(params.get("per_page")))?Number(params.get("per_page")):10;
     const total=await db.prepare("SELECT count(*) AS count FROM daily_ai_digests").first();
     const list=await db.prepare(
-      "SELECT id,issue_date,headline,body,full_body,created_at,updated_at FROM daily_ai_digests "+
+      "SELECT id,issue_date,headline,created_at,updated_at FROM daily_ai_digests "+
       "ORDER BY issue_date DESC,id DESC LIMIT ? OFFSET ?"
     ).bind(perPage,(page-1)*perPage).all();
-    const issues=(list.results||[]).map(row=>({id:row.id,issue_date:row.issue_date,headline:row.headline,preview:firstFiveLines(row.full_body||row.body),created_at:row.created_at,updated_at:row.updated_at}));
+    const issues=(list.results||[]).map(row=>({id:row.id,issue_date:row.issue_date,headline:row.headline,created_at:row.created_at,updated_at:row.updated_at}));
     return respond({ok:true,issues,total:Number(total?.count||0),page,per_page:perPage});
   }catch(error){
     console.error("Daily digest read failed",error);

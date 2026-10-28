@@ -53,10 +53,32 @@
     </section>
     <section class="daily-history shell" id="daily-history" aria-labelledby="daily-history-title">
       <div class="section-intro"><div><p class="section-kicker">RESEARCH DIGEST ARCHIVE</p><h2 id="daily-history-title">往期 AI 文献简报<span class="heading-period">.</span></h2>
-      <p class="section-description">按日期倒序展示每期的标题与正文前 5 行，点击即可查看完整简报。</p></div></div>
-      <p id="daily-history-status" role="status" aria-live="polite">正在加载往期…</p>
-      <div id="daily-history-list" class="daily-history-list"></div>
-      <div id="daily-history-pages" class="daily-history-pages" hidden><button type="button" id="daily-history-prev">上一页</button><span id="daily-history-page"></span><button type="button" id="daily-history-next">下一页</button></div>
+      <p class="section-description">按日期倒序排列，每页默认 10 条。点击列表右侧的“查看完整简报”，在右侧直接阅读当期全部内容。</p></div></div>
+      <div class="daily-history-controls"><label for="daily-history-size">每页展示</label>
+        <select id="daily-history-size"><option value="10" selected>10 条</option><option value="20">20 条</option><option value="30">30 条</option><option value="50">50 条</option></select>
+        <span id="daily-history-status" role="status" aria-live="polite">正在加载往期…</span>
+      </div>
+      <div class="daily-history-layout">
+        <div class="daily-history-left">
+          <div id="daily-history-list" class="daily-history-list" aria-live="polite"></div>
+          <nav class="daily-history-pages" id="daily-history-pages" aria-label="往期文献简报分页">
+            <button type="button" id="daily-history-prev">上一页</button>
+            <span id="daily-history-page">第 1 / 1 页</span>
+            <button type="button" id="daily-history-next">下一页</button>
+            <input id="daily-history-jump" type="number" min="1" max="1" value="1" step="1" inputmode="numeric" aria-label="输入往期简报页码">
+            <button type="button" id="daily-history-go">跳转</button>
+          </nav>
+        </div>
+        <aside class="daily-history-reader" id="daily-history-reader" aria-label="完整文献简报阅读区">
+          <div class="daily-history-reader-head">
+            <div><small id="daily-history-reader-date">RESEARCH DIGEST / FULL TEXT</small>
+              <h3 id="daily-history-reader-title">选择一份简报阅读全文</h3></div>
+            <button id="daily-history-reader-close" type="button" aria-label="关闭阅读">关闭</button>
+          </div>
+          <p id="daily-history-reader-status" role="status" aria-live="polite">在左侧列表点击“查看完整简报”，正文将显示在这里。</p>
+          <pre id="daily-history-reader-body" hidden></pre>
+        </aside>
+      </div>
     </section>
 
     
