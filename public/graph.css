@@ -38,3 +38,11 @@
 .graph-empty{color:#758877;font-size:13px}
 @media(max-width:900px){.graph-layout{grid-template-columns:minmax(0,1fr)}.graph-side{max-height:none}.graph-article-columns{grid-template-columns:minmax(0,1fr)}.graph-backlinks{border-left:0;border-top:1px solid #e2e9e4;padding:15px 0 0}}
 @media(max-width:600px){#graph-canvas{height:420px}.graph-toolbar{padding:13px}.graph-toolbar label:first-child{min-width:100%}.graph-canvas-wrap{border-radius:9px}.graph-article-head{flex-direction:column}}
+
+.graph-cloud-upload{border-top:1px solid #e2eae3;margin-top:18px;padding-top:16px}
+.graph-cloud-upload input[type="file"]{position:absolute;width:1px;height:1px;opacity:0}
+.graph-cloud-upload .graph-secret-label{font-size:12px;font-weight:700;color:#45614f;display:block;margin:11px 0 5px}
+.graph-cloud-upload input[type="password"]{width:100%;box-sizing:border-box;border:1px solid #bbd4c2;border-radius:6px;padding:11px;background:white;font-size:13px}
+.graph-cloud-upload #graph-cloud-submit{width:100%;margin-top:10px}
+.graph-cloud-upload #graph-cloud-submit:disabled{opacity:.55;cursor:wait}
+#graph-cloud-status{overflow-wrap:anywhere}

@@ -1,7 +1,7 @@
 (()=>{"use strict";
 const $=id=>document.getElementById(id),core=window.LiteratureGraphCore;
 if(!core)return;
-let graph={nodes:[],edges:[],stats:{}},view={nodes:[],edges:[]},selected=null,localFiles=new Map(),mode="public",scale=1,ox=0,oy=0,pointer=null,moved=false;
+let graph={nodes:[],edges:[],stats:{}},view={nodes:[],edges:[]},selected=null,localFiles=new Map(),mode="public",scale=1,ox=0,oy=0,pointer=null,moved=false,cloudIndex=[];
 const svgNS="http://www.w3.org/2000/svg",colors={paper:"#8fc3b6",keyword:"#dfae65",material:"#8ccfa0",pollutant:"#f38e93",method:"#9daef8",structure:"#c7a0eb",topic:"#e5bb83"};
 const svg=(type,attrs={})=>{const n=document.createElementNS(svgNS,type);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);return n};
 function escapeText(s){return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -148,11 +148,121 @@ async function loadPublic(){
  mode="public";localFiles.clear();
  try{
   const response=await fetch("/data/literature-graph.json",{cache:"no-store"});
-  if(!response.ok)throw Error("HTTP "+response.status);
-  const data=await response.json();if(!validGraph(data))throw Error("索引格式错误");
-  graph=data;selected=null;scale=1;ox=0;oy=0;filterView();
-  $("graph-import-status").textContent=graph.stats.papers?"已载入网站公开图谱":"网站尚未发布 Markdown 文献库。可先导入本地文件夹预览，或将 .md 放进 public/literature-md/ 后重新构建。";
- }catch(err){setStatus("公开图谱读取失败："+err.message);}
+  if(!response.ok)throw Error("静态图谱 HTTP "+response.status);
+  const staticData=await response.json();if(!validGraph(staticData))throw Error("静态索引格式错误");
+  const cloud=[];
+  let offset=0;
+  do{
+   const response=await fetch("/api/literature-library?index=1&offset="+offset,{cache:"no-store"});
+   if(!response.ok)throw Error("云端文献接口 HTTP "+response.status);
+   const data=await response.json();
+   if(!data.ok)throw Error(data.error||"云端索引不可用");
+   cloud.push(...(data.items||[]));
+   if(cloud.length>10000)throw Error("云端文献超过图谱最大读取量 10000 篇");
+   offset=data.next_offset;
+  }while(offset!==null);
+  cloudIndex=cloud;
+  const notes=staticData.nodes.filter(n=>n.type==="paper");
+  // The static graph still contributes its original edges and tag nodes;
+  // the cloud graph is reconstructed from indexed metadata in-browser.
+  const cloudNodes=cloud.map(row=>{
+   const m=row.metadata||{};
+   return {id:"n:"+row.path,path:row.path,label:m.title||row.path,
+     type:"paper",url:row.url,doi:m.doi||"",journal:m.journal||"",
+     aliases:m.aliases||[],keywords:m.keywords||{},rawLinks:m.rawLinks||[]};
+  });
+  const byPath=new Map();
+  const normalize=core.norm;
+  const allPapers=new Map();
+  for(const n of notes)allPapers.set(normalize(n.path),n);
+  for(const n of cloudNodes)allPapers.set(normalize(n.path),n);
+  const combined=[...allPapers.values()];
+  const terms=new Map(),edges=[],unique=new Set(),unresolved=[];
+  const aliases=new Map();
+  const add=(key,n)=>{const k=normalize(key);if(!k)return;const a=aliases.get(k)||[];if(!a.includes(n))a.push(n);aliases.set(k,a);};
+  for(const n of combined){
+   add(n.path,n);add(n.path.replace(/\.(md|markdown)$/i,""),n);
+   add(n.label,n);add(n.path.split("/").pop().replace(/\.(md|markdown)$/i,""),n);
+   for(const a of n.aliases||[])add(a,n);
+  }
+  const resolve=(value,n)=>{
+   const ref=String(value||"").replace(/\\/g,"/").split("#")[0].trim();
+   const base=n.path.split("/").slice(0,-1).join("/");
+   for(const key of [core.pathClean(base+"/"+ref),ref,ref.replace(/\.(md|markdown)$/i,"")]){
+    const found=aliases.get(normalize(key));if(found&&found.length===1)return found[0];
+   }
+   return null;
+  };
+  const addEdge=(source,target,kind)=>{
+   if(source===target)return;
+   const k=kind+"|"+source+"|"+target;
+   if(unique.has(k))return;unique.add(k);edges.push({source,target,kind});
+  };
+  const cloudSet=new Set(cloudNodes.map(n=>normalize(n.path)));
+  for(const e of staticData.edges||[]){
+   if(e.kind==="wiki"&&combined.some(n=>n.id===e.source)&&combined.some(n=>n.id===e.target))addEdge(e.source,e.target,"wiki");
+  }
+  for(const n of combined){
+   const m=n.rawLinks||[];
+   for(const ref of m){const linked=resolve(ref,n);if(linked)addEdge(n.id,linked.id,"wiki");else unresolved.push({from:n.path,target:ref});}
+   for(const [type,items]of Object.entries(n.keywords||{})){
+    for(const word of Array.isArray(items)?items:[]){
+     const label=String(word||"").trim();if(!label)continue;
+     const id="t:"+type+":"+normalize(label);
+     if(!terms.has(id))terms.set(id,{id,type,label});
+     addEdge(n.id,id,"tag");
+    }
+   }
+  }
+  graph={version:1,nodes:[...combined,...terms.values()],edges,unresolved,
+   stats:{papers:combined.length,tags:terms.size,wikilinks:edges.filter(e=>e.kind==="wiki").length,tagLinks:edges.filter(e=>e.kind==="tag").length,unresolved:unresolved.length}};
+  selected=null;scale=1;ox=0;oy=0;filterView();
+  $("graph-import-status").textContent=graph.stats.papers?
+   "网站公开图谱已加载：云端 "+cloud.length+" 篇、静态 "+staticData.stats.papers+" 篇。":
+   "云端文献库暂无记录。可以在下方使用管理员密钥直接上传 .md 或文件夹。";
+ }catch(err){setStatus("图谱读取失败："+err.message);$("graph-import-status").textContent="云端加载失败："+err.message;}
+}
+async function uploadToCloud(){
+ const status=$("graph-cloud-status"),button=$("graph-cloud-submit"),token=$("graph-cloud-token").value.trim();
+ const files=[...$("graph-cloud-files").files,...$("graph-cloud-folder").files].filter(f=>/\.(md|markdown)$/i.test(f.name));
+ if(!token){status.textContent="请输入 ADMIN_REVIEW_TOKEN 管理员密钥";return;}
+ if(!files.length){status.textContent="请先选择 .md 文件或文件夹";return;}
+ if(files.length>2500){status.textContent="一次最多选择 2500 篇文献";return;}
+ const seen=new Set(),chosen=[];
+ for(const file of files){
+  if(file.size>1048576||file.size===0){status.textContent="单个文件需为 1 MB 以内："+file.name;return;}
+  const path=(file.webkitRelativePath||file.name).replace(/^[^/]+\//,"");
+  if(!path||path.split("/").some(x=>!x||x==="."||x==="..")){status.textContent="文件夹路径异常："+path;return;}
+  if(seen.has(path)){status.textContent="本批选择了重复路径："+path;return;}
+  seen.add(path);chosen.push({file,path});
+ }
+ button.disabled=true;let done=0,created=0,replaced=0;
+ try{
+  let batch=[],batchBytes=0;
+  const send=async()=>{
+   if(!batch.length)return;
+   const response=await fetch("/api/literature-library",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+    body:JSON.stringify({files:batch})});
+   const result=await response.json();
+   if(!response.ok||!result.ok)throw Error(result.error||"上传失败");
+   done+=result.processed;created+=result.created;replaced+=result.replaced;
+   status.textContent="已保存 "+done+" / "+chosen.length+" 篇（新增 "+created+"，覆盖 "+replaced+"）";
+   batch=[];batchBytes=0;
+  };
+  for(const {file,path}of chosen){
+   const content=await file.text();
+   const entry={path,content};
+   const size=new TextEncoder().encode(JSON.stringify(entry)).length;
+   if(batch.length>=8||batchBytes+size>2400000)await send();
+   batch.push(entry);batchBytes+=size;
+  }
+  await send();
+  $("graph-cloud-token").value="";
+  $("graph-cloud-files").value="";$("graph-cloud-folder").value="";
+  await loadPublic();
+  status.textContent="上传成功：共 "+done+" 篇（新增 "+created+"，覆盖 "+replaced+"）。已更新公开知识图谱。";
+ }catch(err){status.textContent="已保存 "+done+" 篇；后续上传失败："+err.message+"。可再次选择相同文件覆盖重试。";}
+ finally{button.disabled=false;}
 }
 async function importFolder(files){
  const chosen=Array.from(files||[]).filter(f=>/\.(?:md|markdown)$/i.test(f.name));
@@ -174,6 +284,7 @@ function init(){
  $("graph-fit").addEventListener("click",()=>{scale=1;ox=0;oy=0;draw();});
  $("graph-files").addEventListener("change",e=>importFolder(e.target.files).catch(err=>$("graph-import-status").textContent="导入失败："+err.message));
  $("graph-reload").addEventListener("click",loadPublic);
+ $("graph-cloud-submit").addEventListener("click",uploadToCloud);
  $("graph-article-close").addEventListener("click",()=>{$("graph-article").hidden=true;});
  loadPublic();
 }

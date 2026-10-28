@@ -82,6 +82,18 @@
    <label class="graph-file-label" for="graph-files">选择 Markdown 文件夹</label>
    <input id="graph-files" type="file" accept=".md,.markdown,text/markdown" webkitdirectory directory multiple>
    <button id="graph-reload" type="button">恢复网站公开图谱</button>
+   <div class="graph-cloud-upload">
+    <h3>上传 Markdown 到云端文献库</h3>
+    <p>选择单个或多个 .md 文件，也可选择整个文件夹。使用管理员密钥上传后，所有访客都能看到云端图谱与原文。</p>
+    <label class="graph-file-label" for="graph-cloud-files">选择 Markdown 文件</label>
+    <input id="graph-cloud-files" type="file" accept=".md,.markdown,text/markdown" multiple>
+    <label class="graph-file-label" for="graph-cloud-folder">选择 Markdown 文件夹</label>
+    <input id="graph-cloud-folder" type="file" accept=".md,.markdown,text/markdown" webkitdirectory directory multiple>
+    <label class="graph-secret-label" for="graph-cloud-token">管理员密钥</label>
+    <input id="graph-cloud-token" type="password" autocomplete="off" placeholder="ADMIN_REVIEW_TOKEN">
+    <button type="button" id="graph-cloud-submit">上传到云端并更新图谱</button>
+    <p id="graph-cloud-status" role="status" aria-live="polite">单文件不超过 1 MB；每批上传 8 个，自动连续处理。</p>
+   </div>
    <p id="graph-import-status" role="status" aria-live="polite"></p>
  </div>
 </aside></div>
