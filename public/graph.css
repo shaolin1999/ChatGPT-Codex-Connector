@@ -1,0 +1,40 @@
+.literature-graph{padding:68px 0 95px}.literature-graph .section-intro h2{font-size:clamp(30px,4vw,46px)}
+.graph-toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:18px;background:#fff;border:1px solid #dce5dd;border-radius:10px}
+.graph-toolbar label{font-size:12px;color:#526b5c;display:flex;flex-direction:column;gap:5px;min-width:130px}
+.graph-toolbar label:first-child{flex:1;min-width:225px}
+.graph-toolbar input,.graph-toolbar select{font:inherit;font-size:13px;padding:11px;background:white;border:1px solid #cedfd2;border-radius:6px;width:100%}
+.graph-toolbar button,.graph-import button,.graph-file-label,.graph-article-head button{font:inherit;font-size:12px;padding:11px 14px;background:#173e34;color:white;border:0;border-radius:6px;cursor:pointer}
+.graph-layout{display:grid;grid-template-columns:minmax(0,1fr) 325px;gap:16px}
+.graph-canvas-wrap{min-width:0;overflow:hidden;background:#12251f;border-radius:12px;border:1px solid #2a4437;position:relative}
+#graph-canvas{display:block;width:100%;height:590px;touch-action:none;cursor:grab}
+#graph-canvas:active{cursor:grabbing}
+.graph-bottom{display:flex;justify-content:space-between;flex-wrap:wrap;gap:5px;color:#b5d0bf;font-size:11px;padding:11px 15px;border-top:1px solid #355143}
+.graph-side{background:#fff;border:1px solid #dce5dd;border-radius:12px;max-height:638px;overflow:auto;padding:20px}
+.graph-side h3{font-size:18px;line-height:1.5;margin:4px 0 12px;overflow-wrap:anywhere}
+.graph-side p,.graph-side small{font-size:12px;color:#687d6d;line-height:1.8}
+.graph-side .graph-node-type{font-size:10px;letter-spacing:1px;color:#327050;font-weight:700}
+.graph-side button.graph-related{display:block;text-align:left;border:0;background:#f2f7f3;color:#244d37;padding:9px;width:100%;margin:7px 0;border-radius:5px;font:inherit;font-size:12px;cursor:pointer;overflow-wrap:anywhere}
+.graph-side .graph-primary{display:block;text-align:center;border-radius:6px;padding:11px;background:#173e34;color:#fff;font-size:12px;border:0;cursor:pointer;width:100%;margin:12px 0}
+.graph-import{border-top:1px solid #e2eae3;margin-top:22px;padding-top:16px}
+.graph-import h3{font-size:15px}
+.graph-file-label{display:block;text-align:center;background:#ecf5ee;color:#245b41;border:1px solid #a9c7b4;margin:10px 0}
+#graph-files{position:absolute;width:1px;height:1px;opacity:0}
+.graph-import button{background:#fff;color:#245b41;border:1px solid #bbd4c2;width:100%}
+.graph-article{margin-top:20px;background:#fff;border:1px solid #dce5dd;border-radius:12px;padding:clamp(20px,3vw,33px)}
+.graph-article-head{display:flex;justify-content:space-between;align-items:start;gap:16px}
+.graph-article-head small{letter-spacing:1.2px;color:#5c8468;font-size:11px}.graph-article-head h3{font-size:clamp(20px,2.5vw,29px);line-height:1.45;overflow-wrap:anywhere;margin:8px 0 12px}
+.graph-article-meta{font-size:12px;color:#758676;margin-bottom:14px;overflow-wrap:anywhere}
+.graph-article-columns{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:25px}
+.graph-markdown{font-size:14px;line-height:1.9;overflow-wrap:anywhere;min-width:0}
+.graph-markdown h1,.graph-markdown h2,.graph-markdown h3{line-height:1.4;margin:22px 0 10px}
+.graph-markdown h1{font-size:25px}.graph-markdown h2{font-size:20px}.graph-markdown h3{font-size:17px}
+.graph-markdown p{white-space:pre-wrap}.graph-markdown pre{background:#edf2ef;padding:14px;overflow:auto;border-radius:7px;white-space:pre;font-size:12px}
+.graph-markdown code{background:#edf2ef;border-radius:3px;padding:2px 4px}
+.graph-markdown a,.graph-backlinks button{color:#23684a}
+.graph-markdown a{cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.graph-backlinks{border-left:1px solid #e2e9e4;padding-left:20px}
+.graph-backlinks h4{margin:0 0 10px;font-size:14px}
+.graph-backlinks button{display:block;text-align:left;border:0;border-radius:5px;background:#f3f8f4;padding:9px 10px;width:100%;font:inherit;font-size:12px;margin:6px 0;overflow-wrap:anywhere;cursor:pointer}
+.graph-empty{color:#758877;font-size:13px}
+@media(max-width:900px){.graph-layout{grid-template-columns:minmax(0,1fr)}.graph-side{max-height:none}.graph-article-columns{grid-template-columns:minmax(0,1fr)}.graph-backlinks{border-left:0;border-top:1px solid #e2e9e4;padding:15px 0 0}}
+@media(max-width:600px){#graph-canvas{height:420px}.graph-toolbar{padding:13px}.graph-toolbar label:first-child{min-width:100%}.graph-canvas-wrap{border-radius:9px}.graph-article-head{flex-direction:column}}
