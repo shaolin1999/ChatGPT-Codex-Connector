@@ -55,7 +55,7 @@ function draw(){
   group.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();select(n.id);}});
   group.addEventListener("pointerdown",event=>{
    event.stopPropagation();event.preventDefault();draggedNode={node:n,pointerId:event.pointerId,element:group,startX:event.clientX,startY:event.clientY};
-   n.fixed=true;group.setPointerCapture(event.pointerId);simulation.alpha=Math.max(simulation.alpha,.19);
+   n.fixed=true;group.setPointerCapture(event.pointerId);simulation.alpha=Math.max(simulation.alpha,.19);if(!simulationFrame)simulationFrame=requestAnimationFrame(tick);
   });
   group.addEventListener("pointermove",event=>{
    if(!draggedNode||draggedNode.node!==n)return;
@@ -64,9 +64,9 @@ function draw(){
    n.y=((event.clientY-box.top)*590/box.height-oy)/scale;
    n.vx=0;n.vy=0;
    if(Math.hypot(event.clientX-draggedNode.startX,event.clientY-draggedNode.startY)>4)group.dataset.dragged="1";
-   simulation.alpha=.28;paint();
+   simulation.alpha=.28;paint();if(!simulationFrame)simulationFrame=requestAnimationFrame(tick);
   });
-  const release=()=>{if(draggedNode?.node===n){n.fixed=false;draggedNode=null;simulation.alpha=.18;}};
+  const release=()=>{if(draggedNode?.node===n){n.fixed=false;draggedNode=null;simulation.alpha=.18;if(!simulationFrame)simulationFrame=requestAnimationFrame(tick);}};
   group.addEventListener("pointerup",release);group.addEventListener("pointercancel",release);
   circles.append(group);return{n,group};
  });
