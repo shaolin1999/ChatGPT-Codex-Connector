@@ -61,7 +61,7 @@ function draw(){
  }
  for(const n of nodes){
   const group=svg("g",{class:"graph-node",tabindex:"0",role:"button","aria-label":n.label});
-  const degree=connected(n.id).length;
+  const degree=view.edges.reduce((count,e)=>count+(e.source===n.id||e.target===n.id?1:0),0);
   const radius=n.type==="paper"?Math.min(12,5+Math.sqrt(degree)*1.4):Math.min(11,4+Math.sqrt(degree)*1.3);
   const dot=svg("circle",{cx:n.x,cy:n.y,r:radius,fill:colors[n.type]||"#b7d5c4",stroke:n.id===selected?"#fff":"#203c31","stroke-width":n.id===selected?2.5:.7});
   group.append(dot);

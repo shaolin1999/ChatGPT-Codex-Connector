@@ -14,7 +14,7 @@ function norm(v){return String(v||"").normalize("NFKC").trim().replace(/\s+/g," 
 function unquote(v){return String(v||"").trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g,"").trim();}
 function pathClean(p){const stack=[];for(const s of String(p||"").replace(/\\/g,"/").replace(/^\.\//,"").split("/")){if(!s||s===".")continue;if(s==="..")stack.pop();else stack.push(s);}return stack.join("/");}
 function stem(path){return(String(path||"").split("/").pop()||"").replace(/\.(?:md|markdown)$/i,"");}
-function values(raw){if(Array.isArray(raw))return raw.flatMap(values);let s=String(raw||"").trim();if(!s)return[];if(s.startsWith("[")&&s.endsWith("]"))s=s.slice(1,-1);return s.split(/\s*[,，;；]\s*/).map(x=>unquote(x.replace(/^\[\[/,"").replace(/\]\]$/,""))).filter(Boolean);}
+function values(raw){if(Array.isArray(raw))return raw.flatMap(values);let s=String(raw||"").trim();if(!s)return[];if(s.startsWith("[")&&s.endsWith("]"))s=s.slice(1,-1);return s.split(/\s*[,，;；、]\s*/).map(x=>unquote(x.replace(/^\[\[/,"").replace(/\]\]$/,""))).filter(Boolean);}
 function frontmatter(md){
  const props={},str=String(md||"").replace(/^\uFEFF/,"");
  const m=str.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\s*\r?\n|$)/);
