@@ -46,3 +46,9 @@
 .graph-cloud-upload #graph-cloud-submit{width:100%;margin-top:10px}
 .graph-cloud-upload #graph-cloud-submit:disabled{opacity:.55;cursor:wait}
 #graph-cloud-status{overflow-wrap:anywhere}
+
+/* Force-directed moving nodes and no default node-count truncation. */
+.graph-node{cursor:grab;outline:none}
+.graph-node:active{cursor:grabbing}
+.graph-all-label{font-size:12px;font-weight:650;color:#2a6958;padding:12px 8px;white-space:nowrap}
+.graph-canvas-wrap #graph-canvas{user-select:none;-webkit-user-select:none}

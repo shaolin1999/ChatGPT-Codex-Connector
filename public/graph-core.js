@@ -88,19 +88,24 @@ function buildGraph(files){
   const found=byName.get(norm(stem(name.replace(/\.(?:md|markdown)$/i,"")+".md")))||byName.get(norm(name));
   return found&&found.length===1?found[0]:null;
  }
+ const missingRefs=new Map();
  const nodes=notes.map(n=>({id:n.id,type:"paper",label:n.title,path:n.path,url:n.url,doi:n.doi,
   journal:n.journal,aliases:n.aliases,keywords:n.keywords,...(n.markdown!==undefined?{markdown:n.markdown}:{})}));
  const edges=[],seen=new Set(),terms=new Map(),unresolved=[];
  function edge(a,b,kind){if(a===b)return;const k=kind+"|"+a+"|"+b;if(seen.has(k))return;seen.add(k);edges.push({source:a,target:b,kind});}
  for(const n of notes){
-  for(const ref of n.rawLinks){const target=resolve(ref,n);if(target)edge(n.id,target.id,"wiki");else unresolved.push({from:n.path,target:ref});}
+  for(const ref of n.rawLinks){const target=resolve(ref,n);if(target)edge(n.id,target.id,"wiki");else {
+   const label=String(ref).split("#")[0].replace(/\\/g,"/").split("/").pop().replace(/\.(?:md|markdown)$/i,"").trim();
+   if(label){const id="t:keyword:"+norm(label);if(!missingRefs.has(id))missingRefs.set(id,{id,type:"keyword",label});edge(n.id,id,"wiki-keyword");}
+   unresolved.push({from:n.path,target:ref});
+  }}
   for(const [type,list]of Object.entries(n.keywords))for(const value of list){
    const label=String(value||"").trim();if(!label)continue;
    const id="t:"+type+":"+norm(label);if(!terms.has(id))terms.set(id,{id,type,label});
    edge(n.id,id,"tag");
   }
  }
- nodes.push(...terms.values());
+ nodes.push(...terms.values());for(const [id,term]of missingRefs){if(!nodes.some(n=>n.id===id))nodes.push(term);}
  return{version:1,nodes,edges,unresolved,stats:{
   papers:notes.length,tags:terms.size,wikilinks:edges.filter(e=>e.kind==="wiki").length,
   tagLinks:edges.filter(e=>e.kind==="tag").length,unresolved:unresolved.length

@@ -1,7 +1,7 @@
 (()=>{"use strict";
 const $=id=>document.getElementById(id),core=window.LiteratureGraphCore;
 if(!core)return;
-let graph={nodes:[],edges:[],stats:{}},view={nodes:[],edges:[]},selected=null,localFiles=new Map(),mode="public",scale=1,ox=0,oy=0,pointer=null,moved=false,cloudIndex=[];
+let graph={nodes:[],edges:[],stats:{}},view={nodes:[],edges:[]},selected=null,localFiles=new Map(),mode="public",scale=1,ox=0,oy=0,pointer=null,moved=false,cloudIndex=[],simulation=null,simulationFrame=0,draggedNode=null;
 const svgNS="http://www.w3.org/2000/svg",colors={paper:"#8fc3b6",keyword:"#dfae65",material:"#8ccfa0",pollutant:"#f38e93",method:"#9daef8",structure:"#c7a0eb",topic:"#e5bb83"};
 const svg=(type,attrs={})=>{const n=document.createElementNS(svgNS,type);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);return n};
 function escapeText(s){return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -12,73 +12,110 @@ function validGraph(data){
 function connected(id){return graph.edges.filter(e=>e.source===id||e.target===id).map(e=>({edge:e,node:graph.nodes.find(n=>n.id===(e.source===id?e.target:e.source))})).filter(x=>x.node);}
 function getById(id){return graph.nodes.find(n=>n.id===id);}
 function filterView(){
- const q=core.norm($("graph-search").value),type=$("graph-type").value,limit=Number($("graph-limit").value);
+ const q=core.norm($("graph-search").value),type=$("graph-type").value;
  const degrees=new Map();
  for(const e of graph.edges){degrees.set(e.source,(degrees.get(e.source)||0)+1);degrees.set(e.target,(degrees.get(e.target)||0)+1);}
  const all=graph.nodes.filter(n=>(type==="all"||n.type===type)&&(!q||core.norm(n.label+" "+(n.path||"")).includes(q)));
- all.sort((a,b)=>(degrees.get(b.id)||0)-(degrees.get(a.id)||0)||a.label.localeCompare(b.label));
- const matched=new Set(all.slice(0,limit).map(n=>n.id));
- // Search and type filters keep directly relevant nodes visible.
- if(type!=="all"||q){for(const e of graph.edges)if(matched.has(e.source)&&!matched.has(e.target)&&matched.size<limit)matched.add(e.target);}
+ const matched=new Set(all.map(n=>n.id));
+ if(type!=="all"||q){for(const e of graph.edges)if(matched.has(e.source))matched.add(e.target);else if(matched.has(e.target))matched.add(e.source);}
  view.nodes=graph.nodes.filter(n=>matched.has(n.id));
  const ids=new Set(view.nodes.map(n=>n.id));
  view.edges=graph.edges.filter(e=>ids.has(e.source)&&ids.has(e.target));
  draw();
- setStatus("文献 "+(graph.stats.papers||0)+" 篇 · 关键词/分类 "+(graph.stats.tags||0)+" 个 · 显示 "+view.nodes.length+" 节点 / "+view.edges.length+" 条关系");
+ setStatus("文献 "+(graph.stats.papers||0)+" 篇 · 关键词/分类 "+(graph.stats.tags||0)+" 个 · 已显示全部 "+view.nodes.length+" 节点 / "+view.edges.length+" 条关系");
 }
+function stopSimulation(){if(simulationFrame)cancelAnimationFrame(simulationFrame);simulationFrame=0;simulation=null;}
 function draw(){
+ stopSimulation();
  const canvas=$("graph-canvas");canvas.replaceChildren();
- const width=900,height=590,defs=svg("g");
+ const width=900,height=590;
  if(!view.nodes.length){
-  const empty=svg("text",{x:450,y:285,"text-anchor":"middle",fill:"#b5d4be","font-size":"17"});
-  empty.textContent="暂无文献图谱。请选择本地 Markdown 文件夹，或在仓库导入公开笔记。";canvas.append(empty);return;
+  const message=svg("text",{x:450,y:285,"text-anchor":"middle",fill:"#b5d4be","font-size":"16"});
+  message.textContent="暂无文献关系。上传 Markdown，或选择本地文件夹导入。";canvas.append(message);return;
  }
- const nodes=view.nodes.map((n,i)=>{
-  const angle=i*2.39996323,r=Math.min(270,24*Math.sqrt(i+1));
-  return {...n,x:width/2+Math.cos(angle)*r,y:height/2+Math.sin(angle)*r,vx:0,vy:0};
- });
- const byId=new Map(nodes.map(n=>[n.id,n]));
- // Deterministic bounded force relaxation avoids adding third-party graph libraries.
- for(let step=0;step<105;step++){
-  for(const n of nodes){n.vx=0;n.vy=0;}
-  for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
-   const a=nodes[i],b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,d2=Math.max(60,dx*dx+dy*dy);
-   if(d2>39000)continue;const power=430/d2;
-   a.vx+=dx*power;a.vy+=dy*power;b.vx-=dx*power;b.vy-=dy*power;
-  }
-  for(const e of view.edges){
-   const a=byId.get(e.source),b=byId.get(e.target);
-   const dx=b.x-a.x,dy=b.y-a.y,d=Math.max(1,Math.hypot(dx,dy));
-   const target=e.kind==="wiki"?110:76,force=(d-target)*.012;
-   a.vx+=dx/d*force;a.vy+=dy/d*force;b.vx-=dx/d*force;b.vy-=dy/d*force;
-  }
-  for(const n of nodes){n.x=Math.max(28,Math.min(width-28,n.x+n.vx*.5+(width/2-n.x)*.001));n.y=Math.max(28,Math.min(height-28,n.y+n.vy*.5+(height/2-n.y)*.001));}
- }
- const viewport=svg("g",{transform:"translate("+ox+" "+oy+") scale("+scale+")"});canvas.append(viewport);
- for(const e of view.edges){
-  const a=byId.get(e.source),b=byId.get(e.target);
-  viewport.append(svg("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:e.kind==="wiki"?"#9ac4b8":"#66857a","stroke-width":e.kind==="wiki"?1.45:.7,"stroke-opacity":e.kind==="wiki"?.75:.35}));
- }
- for(const n of nodes){
+ const nodes=view.nodes.map((n,i)=>({
+  ...n,x:450+Math.cos(i*2.399963)*Math.min(250,14*Math.sqrt(i+1)),
+  y:295+Math.sin(i*2.399963)*Math.min(215,12*Math.sqrt(i+1)),vx:0,vy:0,fixed:false
+ }));
+ const lookup=new Map(nodes.map(n=>[n.id,n]));
+ const viewport=svg("g");canvas.append(viewport);
+ const lines=svg("g"),circles=svg("g");
+ viewport.append(lines,circles);
+ const visualEdges=view.edges.map(e=>{const line=svg("line",{stroke:e.kind==="wiki"?"#b4ded0":"#718c7e","stroke-opacity":e.kind==="wiki"?.75:.43,"stroke-width":e.kind==="wiki"?1.4:.85});lines.append(line);return {...e,el:line,a:lookup.get(e.source),b:lookup.get(e.target)};}).filter(e=>e.a&&e.b);
+ const degrees=new Map();for(const e of visualEdges){degrees.set(e.source,(degrees.get(e.source)||0)+1);degrees.set(e.target,(degrees.get(e.target)||0)+1);}
+ const glyphs=nodes.map(n=>{
   const group=svg("g",{class:"graph-node",tabindex:"0",role:"button","aria-label":n.label});
-  const degree=view.edges.reduce((count,e)=>count+(e.source===n.id||e.target===n.id?1:0),0);
-  const radius=n.type==="paper"?Math.min(12,5+Math.sqrt(degree)*1.4):Math.min(11,4+Math.sqrt(degree)*1.3);
-  const dot=svg("circle",{cx:n.x,cy:n.y,r:radius,fill:colors[n.type]||"#b7d5c4",stroke:n.id===selected?"#fff":"#203c31","stroke-width":n.id===selected?2.5:.7});
-  group.append(dot);
-  if(n.id===selected||n.type==="paper"||degree>=4||nodes.length<55){
-   const label=svg("text",{x:n.x+radius+4,y:n.y+3.6,fill:n.id===selected?"#fff":"#d0e3d5","font-size":n.id===selected?13:10,"pointer-events":"none"});
-   label.textContent=n.label.length>28?n.label.slice(0,26)+"…":n.label;group.append(label);
+  const degree=degrees.get(n.id)||0,radius=n.type==="paper"?Math.min(13,6+Math.sqrt(degree)*1.3):Math.min(12,4.5+Math.sqrt(degree)*1.25);
+  group.append(svg("circle",{r:radius,fill:colors[n.type]||"#bfd7c5",stroke:n.id===selected?"#fff":"#2d473b","stroke-width":n.id===selected?2.7:.7}));
+  if(n.id===selected||n.type==="paper"||degree>=4||nodes.length<70){
+   const label=svg("text",{x:radius+5,y:3,fill:n.id===selected?"#fff":"#d3e7d9","font-size":n.id===selected?13:10,"pointer-events":"none"});
+   label.textContent=n.label.length>31?n.label.slice(0,29)+"…":n.label;group.append(label);
   }
-  group.addEventListener("click",e=>{e.stopPropagation();select(n.id);});
-  group.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select(n.id);}});
-  viewport.append(group);
+  group.addEventListener("click",event=>{event.stopPropagation();if(!group.dataset.dragged)select(n.id);delete group.dataset.dragged;});
+  group.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();select(n.id);}});
+  group.addEventListener("pointerdown",event=>{
+   event.stopPropagation();event.preventDefault();draggedNode={node:n,pointerId:event.pointerId,element:group,startX:event.clientX,startY:event.clientY};
+   n.fixed=true;group.setPointerCapture(event.pointerId);simulation.alpha=Math.max(simulation.alpha,.19);
+  });
+  group.addEventListener("pointermove",event=>{
+   if(!draggedNode||draggedNode.node!==n)return;
+   const box=canvas.getBoundingClientRect();
+   n.x=((event.clientX-box.left)*900/box.width-ox)/scale;
+   n.y=((event.clientY-box.top)*590/box.height-oy)/scale;
+   n.vx=0;n.vy=0;
+   if(Math.hypot(event.clientX-draggedNode.startX,event.clientY-draggedNode.startY)>4)group.dataset.dragged="1";
+   simulation.alpha=.28;paint();
+  });
+  const release=()=>{if(draggedNode?.node===n){n.fixed=false;draggedNode=null;simulation.alpha=.18;}};
+  group.addEventListener("pointerup",release);group.addEventListener("pointercancel",release);
+  circles.append(group);return{n,group};
+ });
+ function paint(){
+  viewport.setAttribute("transform","translate("+ox+" "+oy+") scale("+scale+")");
+  for(const e of visualEdges)e.el.setAttribute("x1",e.a.x),e.el.setAttribute("y1",e.a.y),e.el.setAttribute("x2",e.b.x),e.el.setAttribute("y2",e.b.y);
+  for(const g of glyphs)g.group.setAttribute("transform","translate("+g.n.x+" "+g.n.y+")");
  }
- const down=e=>{if(e.target.closest&&e.target.closest(".graph-node"))return;pointer={x:e.clientX,y:e.clientY,ox,oy};moved=false;canvas.setPointerCapture(e.pointerId);};
+ simulation={alpha:.85,step:0};
+ function tick(){
+  if(!simulation)return;
+  const alpha=simulation.alpha;
+  for(const n of nodes){if(!n.fixed){n.vx+=(450-n.x)*.00028*alpha;n.vy+=(295-n.y)*.00028*alpha;}}
+  // Local repulsion is sampled to avoid O(N^2) work on large paper collections.
+  const count=nodes.length;
+  for(let i=0;i<count;i++){
+   const a=nodes[i],iterations=Math.min(count-1,24);
+   for(let k=1;k<=iterations;k++){
+    const j=(i+k*37)%count;if(j===i)continue;
+    const b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,d2=Math.max(30,dx*dx+dy*dy);
+    if(d2>26000)continue;
+    const impulse=Math.min(.95,210*alpha/d2);
+    if(!a.fixed){a.vx+=dx*impulse;a.vy+=dy*impulse;}
+    if(!b.fixed){b.vx-=dx*impulse;b.vy-=dy*impulse;}
+   }
+  }
+  for(const e of visualEdges){
+   const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.max(1,Math.hypot(dx,dy));
+   const desired=e.kind==="wiki"?96:65;
+   const pull=(d-desired)*.012*alpha,fx=dx/d*pull,fy=dy/d*pull;
+   if(!e.a.fixed){e.a.vx+=fx;e.a.vy+=fy;}
+   if(!e.b.fixed){e.b.vx-=fx;e.b.vy-=fy;}
+  }
+  for(const n of nodes){
+   if(n.fixed)continue;
+   n.vx*=.82;n.vy*=.82;
+   n.x=Math.max(15,Math.min(885,n.x+Math.max(-8,Math.min(8,n.vx))));
+   n.y=Math.max(15,Math.min(575,n.y+Math.max(-8,Math.min(8,n.vy))));
+  }
+  paint();simulation.step++;simulation.alpha=Math.max(.007,simulation.alpha*.986);
+  if(simulation.alpha>.008||draggedNode)simulationFrame=requestAnimationFrame(tick);
+  else simulationFrame=0;
+ }
+ const down=event=>{if(event.target.closest?.(".graph-node"))return;pointer={x:event.clientX,y:event.clientY,ox,oy};canvas.setPointerCapture(event.pointerId);};
  canvas.onpointerdown=down;
- canvas.onpointermove=e=>{if(!pointer)return;const box=canvas.getBoundingClientRect();ox=pointer.ox+(e.clientX-pointer.x)*900/box.width;oy=pointer.oy+(e.clientY-pointer.y)*590/box.height;moved=true;viewport.setAttribute("transform","translate("+ox+" "+oy+") scale("+scale+")");};
- canvas.onpointerup=()=>{pointer=null;};
- canvas.onpointercancel=()=>{pointer=null;};
- canvas.onwheel=e=>{e.preventDefault();const next=Math.max(.45,Math.min(3.2,scale*(e.deltaY>0?.9:1.1)));scale=next;viewport.setAttribute("transform","translate("+ox+" "+oy+") scale("+scale+")");};
+ canvas.onpointermove=event=>{if(!pointer)return;const rect=canvas.getBoundingClientRect();ox=pointer.ox+(event.clientX-pointer.x)*900/rect.width;oy=pointer.oy+(event.clientY-pointer.y)*590/rect.height;paint();};
+ canvas.onpointerup=()=>{pointer=null};canvas.onpointercancel=()=>{pointer=null};
+ canvas.onwheel=event=>{event.preventDefault();scale=Math.max(.3,Math.min(4,scale*(event.deltaY>0?.90:1.1)));paint();};
+ simulationFrame=requestAnimationFrame(tick);
 }
 function button(label,action){const b=document.createElement("button");b.type="button";b.textContent=label;b.className="graph-related";b.addEventListener("click",action);return b;}
 function select(id){
@@ -92,8 +129,8 @@ function select(id){
  }
  const near=connected(id).sort((a,b)=>a.node.label.localeCompare(b.node.label));
  const h=document.createElement("h4");h.textContent="关联节点（"+near.length+"）";panel.append(h);
- for(const x of near.slice(0,45))panel.append(button((core.TYPE_LABELS[x.node.type]||"")+" · "+x.node.label,()=>select(x.node.id)));
- if(near.length>45){const p=document.createElement("p");p.textContent="仅显示前 45 项，请使用搜索缩小范围。";panel.append(p);}
+ for(const x of near)panel.append(button((core.TYPE_LABELS[x.node.type]||"")+" · "+x.node.label,()=>select(x.node.id)));
+ 
  draw();
 }
 function plainMarkdownToDOM(markdown,target){
@@ -176,7 +213,7 @@ async function loadPublic(){
   for(const n of notes)allPapers.set(normalize(n.path),n);
   for(const n of cloudNodes)allPapers.set(normalize(n.path),n);
   const combined=[...allPapers.values()];
-  const terms=new Map(),edges=[],unique=new Set(),unresolved=[];
+  const terms=new Map(),edges=[],unique=new Set(),unresolved=[],orphans=new Map();
   const aliases=new Map();
   const add=(key,n)=>{const k=normalize(key);if(!k)return;const a=aliases.get(k)||[];if(!a.includes(n))a.push(n);aliases.set(k,a);};
   for(const n of combined){
@@ -202,7 +239,11 @@ async function loadPublic(){
   }
   for(const n of combined){
    const m=n.rawLinks||[];
-   for(const ref of m){const linked=resolve(ref,n);if(linked)addEdge(n.id,linked.id,"wiki");else unresolved.push({from:n.path,target:ref});}
+   for(const ref of m){const linked=resolve(ref,n);if(linked)addEdge(n.id,linked.id,"wiki");else{
+     const label=String(ref).split("#")[0].replace(/\\/g,"/").split("/").pop().replace(/\.(md|markdown)$/i,"").trim();
+     if(label){const id="t:keyword:"+normalize(label);if(!orphans.has(id))orphans.set(id,{id,type:"keyword",label});addEdge(n.id,id,"wiki-keyword");}
+     unresolved.push({from:n.path,target:ref});
+    }}
    for(const [type,items]of Object.entries(n.keywords||{})){
     for(const word of Array.isArray(items)?items:[]){
      const label=String(word||"").trim();if(!label)continue;
@@ -212,6 +253,7 @@ async function loadPublic(){
     }
    }
   }
+  for(const [id,node]of orphans)if(!terms.has(id))terms.set(id,node);
   graph={version:1,nodes:[...combined,...terms.values()],edges,unresolved,
    stats:{papers:combined.length,tags:terms.size,wikilinks:edges.filter(e=>e.kind==="wiki").length,tagLinks:edges.filter(e=>e.kind==="tag").length,unresolved:unresolved.length}};
   selected=null;scale=1;ox=0;oy=0;filterView();
@@ -278,7 +320,7 @@ async function importFolder(files){
  $("graph-import-status").textContent="已在浏览器本地导入 "+graph.stats.papers+" 篇、"+graph.stats.tags+" 个关键词/分类，"+graph.stats.unresolved+" 条未解析双链。未上传服务器。";
 }
 function init(){
- for(const id of ["graph-search","graph-type","graph-limit"])$(id).addEventListener(id==="graph-search"?"input":"change",filterView);
+ for(const id of ["graph-search","graph-type"])$(id).addEventListener(id==="graph-search"?"input":"change",filterView);
  $("graph-fit").addEventListener("click",()=>{scale=1;ox=0;oy=0;draw();});
  $("graph-files").addEventListener("change",e=>importFolder(e.target.files).catch(err=>$("graph-import-status").textContent="导入失败："+err.message));
  $("graph-reload").addEventListener("click",loadPublic);
