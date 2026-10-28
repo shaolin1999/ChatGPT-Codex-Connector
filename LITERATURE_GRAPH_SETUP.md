@@ -1,56 +1,33 @@
-# 文献知识图谱：Obsidian Markdown 双链
+# 文献知识图谱：云端 Markdown 上传 + Obsidian 双链
 
-原网页第二版块已由“科研社区统一检索”替换为“文献知识图谱”。可视化节点包括文献、材料、污染物、方法、结构、关键词及研究主题。实线代表文献间的真实 Markdown/Obsidian 双链，细线代表从笔记属性或正文标签抽取的文献—类别关系。不会自行猜测论文之间的关联。
+## 从网站直接上传到 Cloudflare D1（推荐）
 
-## 方案 A：本地文件夹预览（无需部署或上传）
+1. 访问网站首页的 **文献知识图谱**，右侧 **“上传 Markdown 到云端文献库”**。
+2. 点击 **“选择 Markdown 文件”**（多选）或 **“选择 Markdown 文件夹”**（连带子文件夹）。
+3. 输入原有 Cloudflare 管理员密钥 **`ADMIN_REVIEW_TOKEN`**（不是文献分享暗号或代码发布暗号）。
+4. 点击 **“上传到云端并更新图谱”**。前端自动按每批最多 8 篇、整个 JSON 请求最多约 2.4 MB 进行分批上传，显示新增/覆盖数量。
+5. 成功后刷新云端索引，所有访客都能通过图谱浏览文献标题、关键词、双链和原始 Markdown。
 
-进入首页“文献知识图谱” → “选择 Markdown 文件夹”，选择 Obsidian Vault 内含论文笔记的文件夹。浏览器本地解析 .md/.markdown，包含 wiki 双链、Markdown 相对文件链接以及 frontmatter 标签；点击节点查看 Markdown 原文、出链、反向链接及关联关键词。**不会将文件上传到服务器，其他访客看不到你本地导入的数据**。浏览器刷新后需要重新选择目录。单次最多读取 2500 个文件；过大的图谱推荐发布为静态索引。
+**限制：每个 Markdown 文件不超过 1 MiB（UTF-8），每批不超过 8 篇，单次选择最多 2500 篇；建议按专题分批导入。** 用户上传文件不会写入 GitHub，不需要重新部署或执行 GitHub Actions。相同相对路径与文件名将覆盖之前的正文和关键词元数据；不同文件夹下的同名文件保留为不同记录。
 
-## 方案 B：公开发布供所有访客查看
+**存储方式：** D1 绑定名 `DB` 中自动创建 `literature_md_library` 表：`path`、`content`、`meta_json`、`size_bytes`、时间戳。云端图谱通过 `GET /api/literature-library?index=1&offset=0` 分页读取元数据（不下载 Markdown 正文），点击文献时再通过 `GET /api/literature-library?file=...` 按需读取原文。这两个只读接口面向所有访客。**所有上传的 Markdown 属于公开发布内容，不适合保密笔记、未授权的付费论文全文、机密数据。**
 
-将**有权公开**的 Markdown 笔记及其子文件夹放在 GitHub 当前分支的 `public/literature-md/` 目录中，如下所示：
+如显示未绑定 D1：在 Cloudflare Pages 的 Settings → Bindings 中确认 D1 绑定变量为 `DB`，并指向已有网站数据库。如显示管理员密钥无效：在 Pages 的 Secrets 中确认已配置 `ADMIN_REVIEW_TOKEN`，长度至少 32 字符，切勿将密钥粘贴到公开 GitHub 文件。部署新版本后再上传。无需配置新的 R2 存储桶。
 
-```text
-public/
-  literature-md/
-    PFAS/
-      短链PFAS吸附综述.md
-      纤维素功能膜.md
-    Simulation/
-      MD界面水模拟.md
-  data/
-    literature-graph.json
-```
+### 本地临时预览
 
-运行 `node scripts/build-literature-graph.cjs` 即可更新静态图谱索引。已添加 GitHub Actions 工作流 `.github/workflows/literature-graph.yml`：此分支新增、删除或更新 `public/literature-md/` 中的文献时自动重新生成索引并提交，随后由 Cloudflare Pages 正常部署。若 Actions 无法推送，请在 GitHub Actions 权限中允许工作流写入 repository contents；也可以本地运行构建命令并提交生成的 JSON 文件。**不要把未授权出版社全文、付费下载的 PDF、私密研究记录或密钥上传到公开 GitHub 仓库。**
+左侧原有 **“选择 Markdown 文件夹”** 仅在浏览器本地读取和展示文献，刷新页面就会消失。使用云端上传入口才能让其他访客看到文献。
 
-目前仓库里**没有真实论文 Markdown/双链文件**，只有 README 等说明类 Markdown 和 `public/data/papers.json` 中的演示数据。因此上线后的知识图谱初始为空；需要导入真实文献文件后才会出现真实图谱。网页不会把演示论文伪造成真实研究。
+### 可选：GitHub 静态 Markdown
 
-## 解析规则
+已提交 `public/literature-md/.gitkeep`，GitHub 现在会显示 `public/literature-md/` 目录。也可手动将允许公开的 `.md` 提交到该目录，通过脚本 `node scripts/build-literature-graph.cjs` 或已有 GitHub Actions 生成静态图谱索引。网站会把**静态索引 + D1 云端库**合并显示；相同相对路径时云端版本优先。不要上传有版权限制的出版社全文。
 
-- `[[论文文件名]]`、`[[文件名|显示别名]]`、`[[论文文件名#小节]]`、相对 Markdown 链接 `[相关工作](../文献.md)` 会尝试建立文献—文献关系；目标缺失的链接计入未解析。
-- YAML frontmatter 的 `title`、`aliases`、`tags`、`keywords`、`materials`、`pollutants`、`methods`、`structures`、`topics`，以及中文 `关键词`、`材料`、`污染物`、`研究方法`、`结构`、`研究方向` 用于标注分类。
-- 正文 `#标签` 和 “关键词：PFAS、吸附” 也会建立文献—关键词关系。可点击节点后打开原 Markdown，查看针对该文献的反向链接。
-- 对标题有歧义的重复同名文件不会任意建立链接。建议给 Markdown 文件唯一名称、稳定的 frontmatter title、显式相对路径。
-- 画布支持缩放、拖动画布、节点搜索、类别筛选、节点详情。为避免图谱过载，默认最多显示 250 个节点，可手动提高上限。
-- 网站并不直接公开所有本地笔记。静态索引只保存节点、边和文献 metadata；阅读全文时才从 `public/literature-md/` 按需读取 Markdown 文件。
+### 数据库初始化（可选）
 
-## 建议的元数据格式
+正常访问、上传时自动创建新表；如需手工建表，可在 D1 Console 执行仓库根目录 `literature_library_schema.sql`。
 
-```yaml
----
-title: Cellulose-based membranes for short-chain PFAS removal
-tags: [PFAS, adsorption, interfacial water]
-materials: [cellulose]
-pollutants: [PFBA, PFBS]
-methods: [MD, DFT]
-structures: [functional membrane]
-doi: 10.XXXX/actual-doi
----
-# Cellulose-based membranes for short-chain PFAS removal
+### 双链和关键词规则
 
-相关文献：[[另一篇文献]]
-关键词：界面水、选择性吸附
-```
+支持 `[[文件名]]`、`[[文件名|显示别名]]`、`[[文件名#标题]]`、`[文献名](相对路径.md)`，并从 Obsidian YAML frontmatter 的 `tags/keywords/materials/pollutants/methods/structures/topics`、中文属性及正文 `#标签`、`关键词：...` 识别类别关系。反向链接根据原双链方向计算。
 
-需要注意，当前浏览器 Markdown 阅读器是**安全文本排版**（支持标题、段落和可点击双链），不会执行原笔记中的 HTML、JavaScript 或嵌入代码，也不保证 Obsidian 插件的高级语法完全一致。只有上传到静态站点的数据才会被所有访客看到。
+注意：目前是可公开读取的 Markdown 图谱库，不是私人 Obsidian 云同步。不会修改你本地笔记，也没有自动同步本地文件夹；再次上传同路径文件相当于覆盖云端当前版本。建议保留本地原文件备份。

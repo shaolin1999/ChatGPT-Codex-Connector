@@ -171,7 +171,6 @@ async function loadPublic(){
      type:"paper",url:row.url,doi:m.doi||"",journal:m.journal||"",
      aliases:m.aliases||[],keywords:m.keywords||{},rawLinks:m.rawLinks||[]};
   });
-  const byPath=new Map();
   const normalize=core.norm;
   const allPapers=new Map();
   for(const n of notes)allPapers.set(normalize(n.path),n);
@@ -198,7 +197,6 @@ async function loadPublic(){
    const k=kind+"|"+source+"|"+target;
    if(unique.has(k))return;unique.add(k);edges.push({source,target,kind});
   };
-  const cloudSet=new Set(cloudNodes.map(n=>normalize(n.path)));
   for(const e of staticData.edges||[]){
    if(e.kind==="wiki"&&combined.some(n=>n.id===e.source)&&combined.some(n=>n.id===e.target))addEdge(e.source,e.target,"wiki");
   }
